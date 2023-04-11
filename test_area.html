@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://d3js.org/d3.v4.min.js"></script>
+  <style>
+    .tooltip {
+      position: absolute;
+      background-color: white;
+      padding: 5px;
+      border: 1px solid #69b3a2;
+      border-radius: 5px;
+      pointer-events: none;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+<div id="my_dataviz"></div>
+<div id="tooltip" class="tooltip"></div>
+
+<script>
+  // Set the dimensions and margins of the graph
+  var margin = { top: 10, right: 30, bottom: 30, left: 50 },
+    width = 460 - margin.left - margin.right,
+    height = 400 - margin.top - margin.bottom;
+
+  // Append the svg object to the body of the page
+  var svg = d3.select("#my_dataviz")
+    .append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+    .attr("transform",
+      "translate(" + margin.left + "," + margin.top + ")");
+
+  // Read the data
+  d3.json("/data/my_weather_data.json", function (error, data) {
+    if (error) throw error;
+
+    // Format variables
+    data.forEach(function (d) {
+      d.date = d3.timeParse("%Y-%m-%d")(d.date);
+      d.value = d.temperatureHigh;
+    });
+
+    // Add X axis --> it is a date format
+    var x = d3.scaleTime()
+      .domain(d3.extent(data, function (d) { return d.date; }))
+      .range([0, width]);
+    svg.append("g")
+      .attr("transform", "translate(0," + height + ")")
+      .call(d3.axisBottom(x));
+
+    // Add Y axis
+    var y = d3.scaleLinear()
+      .domain([0, d3.max(data, function (d) { return d.value; })])
+      .range([height, 0]);
+    svg.append("g")
+      .call(d3.axisLeft(y));
+
+    // Add the area
+    var area = d3.area()
+      .x(function (d) { return x(d.date); })
+      .y0(y(0))
+      .y1(function (d) { return y(d.value); });
+
+    svg.append("path")
+      .datum(data)
+      .attr("fill", "#cce5df")
+      .attr("stroke", "#69b3a2")
+      .attr("stroke-width", 1.5)
+      .attr("d", area);
+
+    // Create the tooltip div
+    var tooltip = d3.select("#tooltip");
+
+    // Add a circle that follows the mouse
+    var focus = svg.append("circle")
+      .attr("r", 5)
+      .attr("fill", "none")
+      .attr("stroke", "black")
+      .style("display", "none");
+
+    // Add mouse event listeners to the svg
+    svg.append("rect")
+      .attr("width", width)
+      .attr("height", height)
+      .style("fill", "none")
+      .style("pointer-events", "all")
+      .on("mouseover", function() { focus.style("display", null); tooltip.style("display", "inline"); })
+      .on("mouseout", function() { focus.style("display", "none"); tooltip.style("display", "none"); })
+      .on("mousemove", onMouseMove);
+
+      function onMouseMove() {
+        var bisectDate = d3.bisector(function(d) { return d.date; }).left;
+        var x0 = x.invert(d3.mouse(this)[0]);
+        var i = bisectDate(data, x0, 1);
+        var d0 = data[i - 1];
+        var d1 = data[i];
+        var d = x0 - d0.date > d1.date - x0 ? d1 : d0;
+
+        focus.attr("cx", x(d.date))
+            .attr("cy", y(d.value));
+
+        tooltip.html("Date: " + d3.timeFormat("%Y-%m-%d")(d.date) + "<br/>Temperature: " + d.value.toFixed(2) + "°F")
+            .style("left", (d3.event.pageX + 15) + "px")
+            .style("top", (d3.event.pageY - 28) + "px");
+        }
+
+  });
+
+</script>
+</body>
+</html>
+
