@@ -1,22 +1,160 @@
 <!DOCTYPE html>
 <html>
     <head>
-        <title>connected scatter plot for temperature against time</title>
+    <title>Line Chart with Enhancements</title>
+    <script src="https://d3js.org/d3.v4.min.js"></script>
     </head>
-
     <body>
-        
-        
-
+        <div id="my_dataviz"></div>
+        <div id="tooltip" class="tooltip"></div>
     </body>
 
     <script>
-
-
-    </script>
+        // setting up the chart margins , width and height
+        var margin = { top: 50, right: 50, bottom: 50, left: 50 },
+            width = 700 - margin.left - margin.right,
+            height = 700 - margin.top - margin.bottom
+    
+        // create the svg container for the chart , appending it to the div container and
+        // applying the specified dimensions and margins
+        var svg = d3.select("#my_dataviz")
+            .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", "translate(" + margin.left + "," + margin.top + ")")
+    
+        // reading weather data
+        d3.json("/data/my_weather_data.json", function (error, data) {
+            if (error) throw error
+    
+            data.forEach(function (d) {
+                d.date = d3.timeParse("%Y-%m-%d")(d.date)
+                d.value = d.temperatureHigh
+            });
+    
+            // setting up the x axis as the time scale
+            var x = d3.scaleTime()
+                .domain(d3.extent(data, function (d) { return d.date; }))
+                .range([0, width])
+            
+            // append the x axis to the svg
+            var xAxis = svg.append("g")
+                .attr("transform", "translate(0," + height + ")")
+                .call(d3.axisBottom(x))
+    
+            // set up the y axis
+            var y = d3.scaleLinear()
+                .domain([0, d3.max(data, function (d) { return d.value; })])
+                .range([height, 0])
+    
+            // append the y axis to the svg
+            var yAxis = svg.append("g")
+                .call(d3.axisLeft(y))
+    
+            // define the line using d3's line generator
+            var line = d3.line()
+                .x(function (d) { return x(d.date); })
+                .y(function (d) { return y(d.value); })
+    
+            // append the path for the line
+            // set attributes and styles
+            svg.append("path")
+                .datum(data)
+                .attr("fill", "none")
+                .attr("stroke", "#69b3a2")
+                .attr("stroke-width", 1.5)
+                .attr("d", line)
+    
+            // tooltip init
+            var tooltip = d3.select("#tooltip")
+    
+            // append a focus circle to the svg
+            // initially its hidden
+            var focus = svg.append("circle")
+                .attr("r", 5)
+                .attr("fill", "none")
+                .attr("stroke", "black")
+                .style("display", "none")
+    
+            // append a rectangle to the svg to capture mouse events
+            // also adding event listeners for mouse interactions
+            svg.append("rect")
+                .attr("width", width)
+                .attr("height", height)
+                .style("fill", "none")
+                .style("pointer-events", "all")
+                .on("mouseover", function () { focus.style("display", null); tooltip.style("display", null); })
+                .on("mouseout", function () { focus.style("display", "none"); tooltip.style("display", "none"); })
+                .on("mousemove", onMouseMove)
+    
+            // define the onmousemove function , which updates the position of the tooltip 
+            // and focus circle based on the mouse location
+            function onMouseMove() {
+                var bisectDate = d3.bisector(function (d) { return d.date; }).left
+                var x0 = x.invert(d3.mouse(this)[0])
+                var i = bisectDate(data, x0, 1)
+                var d0 = data[i - 1]
+                var d1 = data[i]
+                var d = x0 - d0.date > d1.date - x0 ? d1 : d0
+                focus.attr("cx", x(d.date))
+                .attr("cy", y(d.value))
+    
+            // 
+            tooltip.html("Date: " + d3.timeFormat("%Y-%m-%d")(d.date) + "<br/>Temperature: " + d.value.toFixed(2) + "°F")
+                .style("left", (d3.event.pageX + 15) + "px")
+                .style("top", (d3.event.pageY - 28) + "px")
+            }
+    
+            // Add a title
+            // and append it to the svg
+            svg.append("text")
+                .attr("x", (width / 2))
+                .attr("y", 0 - (margin.top / 2))
+                .attr("text-anchor", "middle")
+                .style("font-size", "16px")
+                .style("text-decoration", "underline")
+                .text("Temperature vs Time")
+    
+            // Add X axis label
+            // appended to the svg id
+            svg.append("text")
+                .attr("x", width / 2)
+                .attr("y", height + margin.bottom / 2)
+                .style("text-anchor", "middle")
+                .text("Date")
+    
+            // Add Y axis label
+            svg.append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", 0 - margin.left / 1.5)
+                .attr("x", 0 - (height / 2))
+                .attr("dy", "1em")
+                .style("text-anchor", "middle")
+                .text("Temperature (°F)")
+    
+            // Add data points
+            svg.selectAll(".dot")
+                .data(data)
+                .enter().append("circle")
+                .attr("class", "dot")
+                .attr("cx", function (d) { return x(d.date); })
+                .attr("cy", function (d) { return y(d.value); })
+                .attr("r", 3)
+                .style("fill", "#69b3a2")
+                })
+                </script>
 
     <style>
-
-
+        .tooltip {
+            position: absolute;
+            background-color: white;
+            padding: 5px;
+            border: 1px solid #69b3a2;
+            border-radius: 5px;
+            pointer-events: none;
+            display: none;
+        }
     </style>
 </html>
+
